@@ -19,6 +19,54 @@ import torch.nn.functional as F
 from basicsr.models.archs.arch_util import LayerNorm2d
 from basicsr.models.archs.local_arch import Local_Base
 
+
+from basicsr.models.archs.downsampling import (
+    PixelUnshuffleDown,
+    ConvStride2Down,
+    FrequencyPreservedPooling,
+)
+from basicsr.models.archs.upsampling import (
+    PixelShuffleUp,
+    LCTCUp,
+    FreqAvgUp,
+)
+
+
+
+def make_downsample(downsample_type, chan):
+    if downsample_type == "convstride2":
+        module = ConvStride2Down(chan, chan * 2)
+        out_chan = chan * 2
+    elif downsample_type == "pixelunshuffle":
+        module = PixelUnshuffleDown()
+        out_chan = chan * 4
+    elif downsample_type == "fp":
+        module = FrequencyPreservedPooling(channels=chan)
+        out_chan = chan * 4
+    else:
+        raise ValueError(f"Unknown downsample_type: {downsample_type}")
+    return module, out_chan
+
+
+def make_upsample(upsample_type, chan, out_chan):
+    if upsample_type == "pixelshuffle":
+        return PixelShuffleUp(chan, out_chan)
+
+    elif upsample_type == "lctc_7":
+        return LCTCUp(chan, out_chan, large_kernel=7, small_kernel=None)
+
+    elif upsample_type == "lctc_11_3":
+        return LCTCUp(chan, out_chan, large_kernel=11, small_kernel=3)
+
+    elif upsample_type == "freqavgup":
+        return FreqAvgUp(chan, out_chan, padding="zero")
+
+    else:
+        raise ValueError(f"Unknown upsample_type: {upsample_type}")
+    
+
+    
+
 class SimpleGate(nn.Module):
     def forward(self, x):
         x1, x2 = x.chunk(2, dim=1)
@@ -83,7 +131,7 @@ class NAFBlock(nn.Module):
 
 class NAFNet(nn.Module):
 
-    def __init__(self, img_channel=3, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], *args, **kwargs):
+    def __init__(self, img_channel=3, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], downsample_type = "convstride2", upsample_type = "pixelshuffle", *args, **kwargs):
         super().__init__()
 
         self.intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
@@ -96,37 +144,29 @@ class NAFNet(nn.Module):
         self.middle_blks = nn.ModuleList()
         self.ups = nn.ModuleList()
         self.downs = nn.ModuleList()
+        self.downsample_type = downsample_type
+        self.upsample_type = upsample_type
 
+        encoder_channels = [width]
         chan = width
+
         for num in enc_blk_nums:
-            self.encoders.append(
-                nn.Sequential(
-                    *[NAFBlock(chan) for _ in range(num)]
-                )
-            )
-            self.downs.append(
-                nn.Conv2d(chan, 2*chan, 2, 2)
-            )
-            chan = chan * 2
+            self.encoders.append(nn.Sequential(*[NAFBlock(chan) for _ in range(num)]))
+            down_module, next_chan = make_downsample(self.downsample_type, chan)
+            self.downs.append(down_module)
+            chan = next_chan
+            encoder_channels.append(next_chan)
+            chan = next_chan
 
         self.middle_blks = \
             nn.Sequential(
                 *[NAFBlock(chan) for _ in range(middle_blk_num)]
             )
 
-        for num in dec_blk_nums:
-            self.ups.append(
-                nn.Sequential(
-                    nn.Conv2d(chan, chan * 2, 1, bias=False),
-                    nn.PixelShuffle(2)
-                )
-            )
-            chan = chan // 2
-            self.decoders.append(
-                nn.Sequential(
-                    *[NAFBlock(chan) for _ in range(num)]
-                )
-            )
+        for num, target_chan in zip(dec_blk_nums, reversed(encoder_channels[:-1])):
+            self.ups.append(make_upsample(self.upsample_type, chan, target_chan))
+            chan = target_chan
+            self.decoders.append(nn.Sequential(*[NAFBlock(chan) for _ in range(num)]))
 
         self.padder_size = 2 ** len(self.encoders)
 
