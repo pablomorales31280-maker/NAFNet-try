@@ -38,7 +38,7 @@ def make_downsample(downsample_type, chan):
         module = ConvStride2Down(chan, chan * 2)
         out_chan = chan * 2
     elif downsample_type == "pixelunshuffle":
-        module = PixelUnshuffleDown()
+        module = PixelUnshuffleDown(chan)
         out_chan = chan * 4
     elif downsample_type == "fp":
         module = FrequencyPreservedPooling(channels=chan)
@@ -156,7 +156,6 @@ class NAFNet(nn.Module):
             self.downs.append(down_module)
             chan = next_chan
             encoder_channels.append(next_chan)
-            chan = next_chan
 
         self.middle_blks = \
             nn.Sequential(
