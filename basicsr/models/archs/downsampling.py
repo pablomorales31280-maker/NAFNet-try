@@ -52,7 +52,7 @@ class FrequencyPreservedPooling(nn.Module):
             low_part = low_part.transpose(2, 3)
         low_part = torch.cat((low_part, low_part, low_part, low_part), dim = 1)
         if self.test_drop_alpha :
-            return T.centerCrop(orig_x_size[-2]//2, orig_x_size[-1]//2)(low_part)
+            return T.CenterCrop(orig_x_size[-2]//2, orig_x_size[-1]//2)(low_part)
         zeroed_high = torch.zeros_like(in_freq)
         zeroed_high[:, :, int(x.shape[2] / 4): int(x.shape[2] / 4 * 3), int(x.shape[3] / 4): int(x.shape[3] / 4 * 3)] = in_freq[:, :, int(x.shape[2] / 4): int(x.shape[2] / 4 * 3), int(x.shape[3] / 4): int(x.shape[3] / 4 * 3)]
         zeroed_high = torch.fft.ifft2(torch.fft.ifftshift(zeroed_high), norm = "forward").real

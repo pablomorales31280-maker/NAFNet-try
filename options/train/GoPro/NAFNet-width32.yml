@@ -92,6 +92,11 @@ val:
       type: calculate_ssim
       crop_border: 0
       test_y_channel: false
+    lpips:
+      type: calculate_lpips
+      crop_border: 0
+      test_y_channel: false
+      net: alex
 
 # logging settings
 logger:
