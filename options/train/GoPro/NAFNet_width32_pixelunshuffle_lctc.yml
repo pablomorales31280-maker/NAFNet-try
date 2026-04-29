@@ -8,7 +8,7 @@
 name: NAFNet_GoPro_width32_pixelunshuffle_lctc
 model_type: ImageRestorationModel
 scale: 1
-num_gpu: 8
+num_gpu: 1
 manual_seed: 42
 
 datasets:
