@@ -169,6 +169,18 @@ class NAFNet(nn.Module):
 
         self.padder_size = 2 ** len(self.encoders)
 
+    def get_sampling_scalars(self):
+        scalars = {}
+        for name, param in self.named_parameters():
+            is_down_alpha = name.startswith("downs.") and name.endswith(".alpha")
+            is_up_beta = name.startswith("ups.") and name.endswith(".beta")
+            if is_down_alpha or is_up_beta:
+                if param.numel() == 1:
+                    scalars[name] = float(param.detach().cpu().item())
+                else:
+                    scalars[name] = param.detach().cpu().view(-1).tolist()
+        return scalars
+
     def forward(self, inp):
         B, C, H, W = inp.shape
         inp = self.check_image_size(inp)

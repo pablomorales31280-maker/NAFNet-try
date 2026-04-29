@@ -344,6 +344,18 @@ def main():
     logger.info(f'End of training. Time consumed: {consumed_time}')
     logger.info('Save the latest model.')
     model.save(epoch=-1, current_iter=-1)  # -1 stands for the latest
+
+    # print learned alpha/beta values if present
+    bare_model = model.net_g
+    if hasattr(bare_model, 'module'):
+        bare_model = bare_model.module
+    if hasattr(bare_model, 'get_sampling_scalars'):
+        sampling_scalars = bare_model.get_sampling_scalars()
+        if sampling_scalars:
+            logger.info('Learned sampling scalars:')
+            for k, v in sampling_scalars.items():
+                logger.info(f'    {k}: {v:.6f}')
+
     if opt.get('val') is not None:
         rgb2bgr = opt['val'].get('rgb2bgr', True)
         use_image = opt['val'].get('use_image', True)
