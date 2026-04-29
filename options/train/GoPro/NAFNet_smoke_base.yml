@@ -112,11 +112,3 @@ logger:
 dist_params:
   backend: nccl
   port: 29500
-
-# Adversarial Attack Settings
-attack: 
-  method: pgd
-  alpha: 0.01
-  epsilon: 0.03137254901
-  iterations: 3
-  targeted: false
