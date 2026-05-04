@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=train_fp_pixelshuffle
-#SBATCH --partition=gpu-vram-48gb
+#SBATCH --partition=gpu-vram-94gb
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=30G
 #SBATCH --gres=gpu:1

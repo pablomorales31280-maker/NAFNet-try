@@ -82,7 +82,7 @@ train:
 val:
   val_freq: !!float 1000000
   save_img: false
-
+  max_minibatch: 1
 
   metrics:
     psnr: # metric name, can be arbitrary
