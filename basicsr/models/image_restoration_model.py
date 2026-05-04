@@ -322,157 +322,123 @@ class ImageRestorationModel(BaseModel):
     #@autocast()
     def test(self):
         self.net_g.eval()
-        attack_opt = self.opt.get('attack', None)
-        attack_exists = bool(self.opt.get('attacking', False) and attack_opt is not None)
-        self.data_grad = None
-        if not attack_exists:
+       
+        #import ipdb;ipdb.set_trace()
+        attack_exists = False
+        iterations = 1
+        try:
+            attack_opt = self.opt['attack']
+            attack_exists = True
+        except KeyError:
+            attack_exists = False
+            attack_opt = None
+        
+        #attack_opt = self.opt['attack'] if attack_exists else None
+        if not self.opt['attacking']:
+            attack_exists = False
+            attack_opt = None
+        if attack_opt != None:
+            #print("\n\n\t\t\tATTACKING")
+            orig_image = self.lq.clone()
+            targeted = attack_opt['targeted']
+            if 'cospgd' in attack_opt['method'] or attack_opt['method'] == 'segpgd' or attack_opt['method'] == 'pgd':
+                self.lq = self.lq + torch.FloatTensor(self.lq.shape).uniform_(-1*attack_opt['epsilon'], attack_opt['epsilon']).to(self.lq.device)
+            self.lq.requires_grad= True
+            self.lq.retain_grad()
+            iterations = attack_opt['iterations']
+
+        # define losses
+        if attack_exists:
+            train_opt = self.opt['train']
+            if train_opt.get('pixel_opt'):
+                try:
+                    pixel_type = train_opt['pixel_opt'].pop('type')
+                except Exception:
+                    import ipdb;ipdb.set_trace()
+                #pixel_type = 'PSNRLoss'
+                cri_pix_cls = getattr(loss_module, pixel_type)
+                self.cri_pix = cri_pix_cls(**train_opt['pixel_opt']).to(
+                    self.device)
+                train_opt['pixel_opt']['type'] = pixel_type
+            
+
+        with torch.enable_grad():
+            #import ipdb;ipdb.set_trace()
+            #with autocast():
             n = len(self.lq)
             outs = []
-            m = self.opt['val'].get('max_minibatch', 1)
-            with torch.no_grad():
-                i = 0
-                while i < n:
-                    j = min(i + m, n)
-                    pred = self.net_g(self.lq[i:j])
-                    if isinstance(pred, list):
-                        pred = pred[-1]
-                    outs.append(pred.detach().cpu())
-                    del pred
-                    i = j
-            self.output = torch.cat(outs, dim=0)
-            self.outs = self.output
-            del outs
-            self.net_g.train()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            return self.data_grad
-        orig_image = self.lq.detach().clone()
-        targeted = attack_opt['targeted']
-        iterations = attack_opt['iterations']
-        if ('cospgd' in attack_opt['method'] or
-                attack_opt['method'] == 'segpgd' or
-                attack_opt['method'] == 'pgd'):
-            self.lq = self.lq + torch.empty_like(self.lq).uniform_(-attack_opt['epsilon'], attack_opt['epsilon'])
-            self.lq = torch.clamp(self.lq, 0, 1).detach()
-        train_opt = self.opt['train']
-        if train_opt.get('pixel_opt'):
-            pixel_type = train_opt['pixel_opt'].pop('type')
-            cri_pix_cls = getattr(loss_module, pixel_type)
-            self.cri_pix = cri_pix_cls(**train_opt['pixel_opt']).to(self.device)
-            train_opt['pixel_opt']['type'] = pixel_type
-        n = len(self.lq)
-        m = self.opt['val'].get('max_minibatch', 1)
-        def forward_lq_for_attack(lq_tensor):
-            attack_outs = []
+            m = self.opt['val'].get('max_minibatch', n)
             i = 0
             while i < n:
-                j = min(i + m, n)
-                pred = self.net_g(lq_tensor[i:j])
-                if isinstance(pred, list):
-                    pred = pred[-1]
-                attack_outs.append(pred)
-                i = j
-            return attack_outs
-        with torch.enable_grad():
-            for t in range(iterations):
-                self.lq = self.lq.detach().requires_grad_(True)
-                outs = forward_lq_for_attack(self.lq)
-                if targeted:
-                    self.gt = torch.ones_like(self.gt)
-                l_pix = 0.
-                for pred in outs:
-                    l_pix += self.cri_pix(pred, self.gt)
-                if 'cospgd' in attack_opt['method']:
-                    if attack_opt['method'] == 'cospgd_softmax':
-                        cossim = F.cosine_similarity(
-                            F.softmax(self.lq, dim=1),
-                            F.softmax(self.gt, dim=1),
-                            dim=1,
-                            eps=10**-20
-                        )
-                    elif attack_opt['method'] == 'cospgd_sigmoid':
-                        cossim = F.sigmoid(
-                            F.cosine_similarity(self.lq, self.gt, dim=1, eps=10**-20)
-                        )
-                    else:
-                        cossim = F.cosine_similarity(
-                            F.softmax(self.lq, dim=1),
-                            F.softmax(self.gt, dim=1),
-                            dim=1,
-                            eps=10**-20
-                        )
-                    if targeted:
-                        cossim = 1 - cossim
-                    l_pix = cossim.detach() * l_pix
-                    l_pix = torch.sum(l_pix)
-                    l_pix /= cossim.shape[-1] * cossim.shape[-2]
-                elif attack_opt['method'] == 'segpgd':
-                    lambda_t = t / (2 * iterations)
-                    l_pix = torch.sum(
-                        torch.where(
-                            pred == self.gt,
-                            (1 - lambda_t) * l_pix,
-                            lambda_t * l_pix
-                        )
-                    ) / (pred.shape[-2] * pred.shape[-1])
-                else:
-                    l_pix = l_pix.mean()
-                data_grad = torch.autograd.grad(
-                    l_pix,
-                    self.lq,
-                    retain_graph=False,
-                    create_graph=False
-                )[0]
-                self.data_grad = str(data_grad.max().item())
-                self.lq = self.fgsm_attack(
-                    self.lq,
-                    attack_opt['epsilon'],
-                    attack_opt['alpha'],
-                    data_grad,
-                    orig_image,
-                    targeted=targeted
-                )
-                self.net_g.zero_grad(set_to_none=True)
-                del outs, l_pix, data_grad
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-        final_outs = []
-        with torch.no_grad():
-            i = 0
-            while i < n:
-                j = min(i + m, n)
+                j = i + m
+                if j >= n:
+                    j = n
                 pred = self.net_g(self.lq[i:j])
                 if isinstance(pred, list):
                     pred = pred[-1]
-                final_outs.append(pred.detach().cpu())
-                del pred
+                outs.append(pred)#.detach())#.cpu())
                 i = j
-        self.output = torch.cat(final_outs, dim=0)
-        self.outs = self.output
-        del final_outs
+
+            self.output = torch.cat(outs, dim=0).detach().cpu()
+
+            #import ipdb;ipdb.set_trace()
+            if attack_exists and self.cri_pix:      
+                if targeted:
+                    self.gt = torch.ones_like(self.gt)  
+                for t in range(iterations):
+                    # pixel loss   
+                    #print("\n\t\t\t\tIterations: {}".format(t))             
+                    l_pix = 0.
+                    for pred in outs:
+                        l_pix += self.cri_pix(pred, self.gt)
+
+                        # print('l pix ... ', l_pix)
+                    if 'cospgd' in attack_opt['method']:                    
+                        if attack_opt['method'] == 'cospgd_softmax':
+                            cossim = F.cosine_similarity(F.softmax(self.lq, dim=1), F.softmax(self.gt, dim=1), dim=1, eps=10**-20)                        
+                        elif attack_opt['method'] == 'cospgd_sigmoid':
+                            cossim = F.sigmoid(F.cosine_similarity(self.lq, self.gt, dim=1, eps=10**-20))
+                        else:
+                            #cossim = F.cosine_similarity(self.lq, self.gt, dim=1, eps=10**-20)                        
+                            cossim = F.cosine_similarity(F.softmax(self.lq, dim=1), F.softmax(self.gt, dim=1), dim=1, eps=10**-20)
+                        if targeted:
+                            cossim = 1 - cossim
+                        l_pix = cossim.detach() * l_pix
+                        l_pix = torch.sum(l_pix)
+                        l_pix /= cossim.shape[-1]*cossim.shape[-2]
+                    elif attack_opt['method'] == 'segpgd':                    
+                        lambda_t = t/(2*iterations)
+                        #output_idx = torch.argmax(outputs, dim=1)
+                        l_pix=torch.sum(torch.where(pred==self.gt, (1-lambda_t)*l_pix, lambda_t*l_pix))/(pred.shape[-2]*pred.shape[-1])
+                    else:
+                        l_pix = l_pix.mean()
+                    data_grad = torch.autograd.grad(l_pix, self.lq, retain_graph=False, create_graph=False)[0]
+                    self.data_grad = str(data_grad.max().item())
+                    self.lq = self.fgsm_attack(self.lq, attack_opt['epsilon'], attack_opt['alpha'], data_grad, orig_image, targeted=targeted)
+                    self.net_g.zero_grad()
+                    self.lq.requires_grad = True 
+
+                    outs = []
+                    m = self.opt['val'].get('max_minibatch', n)
+                    i = 0
+                    while i < n:
+                        j = i + m
+                        if j >= n:
+                            j = n
+                        pred = self.net_g(self.lq[i:j])
+                        if isinstance(pred, list):
+                            pred = pred[-1]
+                        outs.append(pred)#.detach())#.cpu())
+                        i = j
+
+                    self.output = torch.cat(outs, dim=0).detach().cpu()
+                    #self.lq.retain_grad()                                               
+                l_pix = 0.
+                for pred in outs:
+                    l_pix += self.cri_pix(pred, self.gt)
         self.net_g.train()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        torch.cuda.empty_cache()                            
         return self.data_grad
-
-
-    def _slice_val_data(self, val_data, sample_idx):
-        one_sample = {}
-        for key, value in val_data.items():
-            if torch.is_tensor(value):
-                one_sample[key] = value[sample_idx:sample_idx + 1]
-            elif isinstance(value, (list, tuple)):
-                one_sample[key] = [value[sample_idx]]
-            else:
-                one_sample[key] = value
-        return one_sample
-
-    def _release_validation_tensors(self):
-        for attr in ('lq', 'gt', 'output', 'outs', 'origin_lq', 'idxes', 'original_size'):
-            if hasattr(self, attr):
-                delattr(self, attr)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
 
     def dist_validation(self, dataloader, current_iter, tb_logger, save_img, rgb2bgr, use_image):
         dataset_name = dataloader.dataset.opt['name']
@@ -483,6 +449,7 @@ class ImageRestorationModel(BaseModel):
                 metric: 0
                 for metric in self.opt['val']['metrics'].keys()
             }
+
         rank, world_size = get_dist_info()
         try:
             os.environ['MASTER_ADDR'] = 'localhost'
@@ -490,107 +457,104 @@ class ImageRestorationModel(BaseModel):
             dist.init_process_group("gloo", rank=rank, world_size=world_size)
         except Exception:
             pass
+
         if rank == 0:
-            pbar = tqdm(total=len(dataloader.dataset), unit='image')
+            pbar = tqdm(total=len(dataloader), unit='image')
+
         cnt = 0
+
         for idx, val_data in enumerate(dataloader):
             if idx % world_size != rank:
                 continue
-            batch_size = val_data['lq'].size(0) if torch.is_tensor(val_data.get('lq', None)) else 1
-            for sample_idx in range(batch_size):
-                one_val_data = self._slice_val_data(val_data, sample_idx)
-                img_name = osp.splitext(osp.basename(one_val_data['lq_path'][0]))[0]
-                try:
-                    # 1. Charger une seule image sur GPU.
-                    self.feed_data(one_val_data, is_val=True)
-                    # 2. Si validation par grille, construire les crops.
-                    if self.opt['val'].get('grids', False):
-                        self.grids()
-                    # 3. Attaque éventuelle + inférence.
-                    self.data_grad = self.test()
-                    if rank == 0:
-                        pbar.set_postfix({"Sanity ": self.data_grad})
-                    # 4. Recomposer l'image si validation par grille.
-                    if self.opt['val'].get('grids', False):
-                        self.grids_inverse()
-                    # 5. Récupérer les sorties sur CPU.
-                    visuals = self.get_current_visuals()
-                    sr_img = tensor2img([visuals['result']], rgb2bgr=rgb2bgr)
-                    gt_img = None
-                    if 'gt' in visuals:
-                        gt_img = tensor2img([visuals['gt']], rgb2bgr=rgb2bgr)
-                    # 6. Sauvegarder les images si demandé.
-                    if save_img:
-                        if sr_img.shape[2] == 6:
-                            L_img = sr_img[:, :, :3]
-                            R_img = sr_img[:, :, 3:]
-                            visual_dir = osp.join(self.opt['path']['visualization'], dataset_name)
-                            imwrite(L_img, osp.join(visual_dir, f'{img_name}_L.png'))
-                            imwrite(R_img, osp.join(visual_dir, f'{img_name}_R.png'))
-                        else:
-                            if self.opt['is_train']:
-                                save_img_path = osp.join(
-                                    self.opt['path']['visualization'],
-                                    img_name,
-                                    f'{img_name}_{current_iter}.png'
-                                )
-                                save_gt_img_path = osp.join(
-                                    self.opt['path']['visualization'],
-                                    img_name,
-                                    f'{img_name}_{current_iter}_gt.png'
-                                )
-                            else:
-                                save_img_path = osp.join(
-                                    self.opt['path']['visualization'],
-                                    dataset_name,
-                                    f'{img_name}.png'
-                                )
-                                save_gt_img_path = osp.join(
-                                    self.opt['path']['visualization'],
-                                    dataset_name,
-                                    f'{img_name}_gt.png'
-                                )
-                            imwrite(sr_img, save_img_path)
-                            if gt_img is not None:
-                                imwrite(gt_img, save_gt_img_path)
-                    # 7. Calculer les métriques pour cette image uniquement.
-                    if with_metrics:
-                        opt_metric = deepcopy(self.opt['val']['metrics'])
-                        if use_image:
-                            for name, opt_ in opt_metric.items():
-                                metric_type = opt_.pop('type')
-                                self.metric_results[name] += getattr(metric_module, metric_type)(
-                                    sr_img,
-                                    gt_img,
-                                    **opt_
-                                )
-                        else:
-                            for name, opt_ in opt_metric.items():
-                                metric_type = opt_.pop('type')
-                                self.metric_results[name] += getattr(metric_module, metric_type)(
-                                    visuals['result'],
-                                    visuals['gt'],
-                                    **opt_
-                                )
-                    cnt += 1
-                    if rank == 0:
-                        pbar.update(1)
-                        pbar.set_description(f'Test {img_name}')
-                finally:
-                    # 8. Quoi qu'il arrive, libérer les tensors de cette image.
-                    self._release_validation_tensors()
+
+            img_name = osp.splitext(osp.basename(val_data['lq_path'][0]))[0]
+
+            self.feed_data(val_data, is_val=True)
+            if self.opt['val'].get('grids', False):
+                self.grids()
+
+            self.data_grad = self.test()
+            #print("Done: {}".format(idx))
+            if rank == 0:
+                pbar.set_postfix({"Sanity ":self.data_grad})
+            
+
+            if self.opt['val'].get('grids', False):
+                self.grids_inverse()
+
+            visuals = self.get_current_visuals()
+            sr_img = tensor2img([visuals['result']], rgb2bgr=rgb2bgr)
+            if 'gt' in visuals:
+                gt_img = tensor2img([visuals['gt']], rgb2bgr=rgb2bgr)
+                del self.gt
+
+            # tentative for out of GPU memory
+            del self.lq
+            del self.output
+            torch.cuda.empty_cache()
+
+            if save_img:
+                if sr_img.shape[2] == 6:
+                    L_img = sr_img[:, :, :3]
+                    R_img = sr_img[:, :, 3:]
+
+                    # visual_dir = osp.join('visual_results', dataset_name, self.opt['name'])
+                    visual_dir = osp.join(self.opt['path']['visualization'], dataset_name)
+
+                    imwrite(L_img, osp.join(visual_dir, f'{img_name}_L.png'))
+                    imwrite(R_img, osp.join(visual_dir, f'{img_name}_R.png'))
+                else:
+                    if self.opt['is_train']:
+
+                        save_img_path = osp.join(self.opt['path']['visualization'],
+                                                 img_name,
+                                                 f'{img_name}_{current_iter}.png')
+
+                        save_gt_img_path = osp.join(self.opt['path']['visualization'],
+                                                 img_name,
+                                                 f'{img_name}_{current_iter}_gt.png')
+                    else:
+                        save_img_path = osp.join(
+                            self.opt['path']['visualization'], dataset_name,
+                            f'{img_name}.png')
+                        save_gt_img_path = osp.join(
+                            self.opt['path']['visualization'], dataset_name,
+                            f'{img_name}_gt.png')
+
+                    imwrite(sr_img, save_img_path)
+                    imwrite(gt_img, save_gt_img_path)
+
+            if with_metrics:
+                # calculate metrics
+                opt_metric = deepcopy(self.opt['val']['metrics'])
+                if use_image:
+                    for name, opt_ in opt_metric.items():
+                        metric_type = opt_.pop('type')
+                        self.metric_results[name] += getattr(
+                            metric_module, metric_type)(sr_img, gt_img, **opt_)
+                else:
+                    for name, opt_ in opt_metric.items():
+                        metric_type = opt_.pop('type')
+                        self.metric_results[name] += getattr(
+                            metric_module, metric_type)(visuals['result'], visuals['gt'], **opt_)
+
+            cnt += 1
+            if rank == 0:
+                for _ in range(world_size):
+                    pbar.update(1)
+                    pbar.set_description(f'Test {img_name}')
         if rank == 0:
             pbar.close()
+
+        # current_metric = 0.
         collected_metrics = OrderedDict()
         if with_metrics:
             for metric in self.metric_results.keys():
                 collected_metrics[metric] = torch.tensor(self.metric_results[metric]).float().to(self.device)
             collected_metrics['cnt'] = torch.tensor(cnt).float().to(self.device)
+
             self.collected_metrics = collected_metrics
-        else:
-            self.collected_metrics = OrderedDict(
-                cnt=torch.tensor(cnt).float().to(self.device)
-            )
+        
         keys = []
         metrics = []
         for name, value in self.collected_metrics.items():
@@ -598,7 +562,7 @@ class ImageRestorationModel(BaseModel):
             metrics.append(value)
         metrics = torch.stack(metrics, 0)
         torch.distributed.reduce(metrics, dst=0)
-        if self.opt['rank'] == 0 and with_metrics:
+        if self.opt['rank'] == 0:
             metrics_dict = {}
             cnt = 0
             for key, metric in zip(keys, metrics):
@@ -606,21 +570,18 @@ class ImageRestorationModel(BaseModel):
                     cnt = float(metric)
                     continue
                 metrics_dict[key] = float(metric)
+
             for key in metrics_dict:
                 metrics_dict[key] /= cnt
-            self._log_validation_metric_values(
-                current_iter,
-                dataloader.dataset.opt['name'],
-                tb_logger,
-                metrics_dict
-            )
+
+            self._log_validation_metric_values(current_iter, dataloader.dataset.opt['name'],
+                                               tb_logger, metrics_dict)
         return 0.
 
     def nondist_validation(self, *args, **kwargs):
         logger = get_root_logger()
         logger.warning('nondist_validation is not implemented. Run dist_validation.')
-        return self.dist_validation(*args, **kwargs)
-
+        self.dist_validation(*args, **kwargs)
 
     def _log_validation_metric_values(self, current_iter, dataset_name,
                                       tb_logger, metric_dict):

@@ -82,6 +82,9 @@ val:
   val_freq: !!float 2e4
   save_img: false
   max_minibatch: 1
+  grids: true
+  crop_size_h: 128
+  crop_size_w: 128
 
   metrics:
     psnr: # metric name, can be arbitrary

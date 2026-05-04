@@ -39,7 +39,7 @@ class FrequencyPreservedPooling(nn.Module):
 
     def forward(self, x):
         orig_x_size = x.shape
-        orig_x = x.clone()
+        orig_x = x
         x = F.pad(x, (3*x.shape[-1]//4+1, 3*x.shape[-1]//4, 3*x.shape[-2]//4+1, 3*x.shape[-2]//4), mode = self.padding)
         if self.transpose :
             x = x.transpose(2, 3)
