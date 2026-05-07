@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=train_conv_freqavgup
-#SBATCH --partition=gpu-vram-48gb
+#SBATCH --partition=gpu-vram-94gb
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=30G
+#SBATCH --mem=100G
 #SBATCH --gres=gpu:1
 #SBATCH --time=5-00:00:00
-#SBATCH --output=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/NAFNet_width32_conv_freqavgup.out
-#SBATCH --error=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/NAFNet_width32_conv_freqavgup.err
+#SBATCH --output=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/NAFNet_width32_conv_freqavgup_%J.out
+#SBATCH --error=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/NAFNet_width32_conv_freqavgup_%J.err
 
 set -euo pipefail
 

@@ -28,7 +28,7 @@ class ConvStride2Down(nn.Module):
 class FrequencyPreservedPooling(nn.Module):
     def __init__(self, channels = None, test_wo_drop_alpha = False, transpose = True, test_drop_alpha = False, stop = False, half_precision = False, padding = "reflect"):
         super().__init__()
-        self.transpose = transpose
+        self.transpose = transpose  
         self.test_wo_drop_alpha = test_wo_drop_alpha
         self.test_drop_alpha = test_drop_alpha
         self.stop = stop
