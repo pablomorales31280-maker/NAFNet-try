@@ -1,0 +1,52 @@
+name: NAFNet_width32_base_conv_pixelshuffle_test
+model_type: ImageRestorationModel
+scale: 1
+num_gpu: 1
+manual_seed: 42
+
+datasets:
+  test:
+    name: GoPro-test
+    type: PairedImageDataset
+    dataroot_gt: ./datasets/GoPro/test/target.lmdb
+    dataroot_lq: ./datasets/GoPro/test/input.lmdb
+    io_backend:
+      type: lmdb
+
+network_g:
+  type: NAFNet
+  img_channel: 3
+  width: 32
+  middle_blk_num: 1
+  enc_blk_nums: [1, 1, 1, 28]
+  dec_blk_nums: [1, 1, 1, 1]
+  downsample_type: convstride2
+  upsample_type: pixelshuffle
+
+path:
+  pretrain_network_g: ./experiments/new_flc_attack/NAFNet_GoPro_width32_base_conv_pixelshuffle/models/net_g_latest.pth
+  strict_load_g: true
+  resume_state: ~
+
+val:
+  save_img: false
+  rgb2bgr: true
+  use_image: true
+  metrics:
+    psnr:
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: false
+    lpips:
+      type: calculate_lpips
+      crop_border: 0
+      test_y_channel: false
+      net: alex
+
+dist_params:
+  backend: nccl
+  port: 29500

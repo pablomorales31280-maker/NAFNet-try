@@ -15,7 +15,7 @@ class PixelUnshuffleDown(nn.Module):
 
 
 class ConvStride2Down(nn.Module):
-    def __init__(self, in_channels, out_channels = None, bias = False):
+    def __init__(self, in_channels, out_channels = None, bias = True):
         super().__init__()
         if  out_channels is None :
             out_channels = in_channels * 2

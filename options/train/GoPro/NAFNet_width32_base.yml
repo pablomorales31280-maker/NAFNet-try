@@ -27,7 +27,7 @@ datasets:
     # data loader
     use_shuffle: true
     num_worker_per_gpu: 4
-    batch_size_per_gpu: 4
+    batch_size_per_gpu: 32
     dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
@@ -104,7 +104,7 @@ val:
 # logging settings
 logger:
   print_freq: 200
-  save_checkpoint_freq: !!float 5e3
+  save_checkpoint_freq: !!float 5e4
   use_tb_logger: true
   wandb:
     project: ~
