@@ -3,6 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 
 
+
+
 class PixelShuffleUp(nn.Module):
     def __init__(self, in_channels, out_channels = None, bias = False):
         super().__init__()
@@ -68,3 +70,55 @@ class FreqAvgUp(nn.Module):
             high_spatial = high_spatial.transpose(2, 3)
         beta = self.beta.to(device = x.device, dtype = low_spatial.dtype)
         return low_spatial * (1 - beta) + high_spatial * beta
+    
+
+
+class IgnoreGuide(nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, x, guide=None):
+        return self.module(x)
+
+
+class AnyUpInspired(nn.Module):
+    def __init__(self, chan, target_chan, bias=False):
+        super().__init__()
+
+        self.low_proj = nn.Conv2d(chan, target_chan, kernel_size=1, bias=bias)
+        self.guide_proj = nn.Conv2d(target_chan, target_chan, kernel_size=1, bias=bias)
+
+        self.refine = nn.Sequential(
+            nn.Conv2d(target_chan * 2, target_chan, kernel_size=1, bias=bias),
+            nn.GELU(),
+            nn.Conv2d(
+                target_chan,
+                target_chan,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                groups=target_chan,
+                bias=bias,
+            ),
+            nn.Conv2d(target_chan, target_chan, kernel_size=1, bias=bias),
+        )
+
+        self.gamma = nn.Parameter(torch.zeros((1, target_chan, 1, 1)))
+
+    def forward(self, x, guide=None):
+        x = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False)
+        x = self.low_proj(x)
+
+        if guide is None:
+            return x
+
+        if x.shape[-2:] != guide.shape[-2:]:
+            x = F.interpolate(x, size=guide.shape[-2:], mode="bilinear", align_corners=False)
+
+        g = self.guide_proj(guide)
+
+        fused = torch.cat([x, g], dim=1)
+        refined = self.refine(fused)
+
+        return x + refined * self.gamma
