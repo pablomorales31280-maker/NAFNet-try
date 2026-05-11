@@ -169,16 +169,17 @@ class NAFNet(nn.Module):
 
         self.padder_size = 2 ** len(self.encoders)
 
+
     def get_sampling_scalars(self):
         scalars = {}
         for name, param in self.named_parameters():
             is_down_alpha = name.startswith("downs.") and name.endswith(".alpha")
             is_up_beta = name.startswith("ups.") and name.endswith(".beta")
-            if is_down_alpha or is_up_beta:
-                if param.numel() == 1:
-                    scalars[name] = float(param.detach().cpu().item())
-                else:
-                    scalars[name] = param.detach().cpu().view(-1).tolist()
+            is_anyup_gamma = name.startswith("ups.") and name.endswith(".gamma")
+
+            if is_down_alpha or is_up_beta or is_anyup_gamma:
+                values = param.detach().cpu().view(-1)
+                scalars[name] = float(values.mean().item())
         return scalars
 
     def forward(self, inp):
