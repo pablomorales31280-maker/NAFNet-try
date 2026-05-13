@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=train_conv_freqavgup
 #SBATCH --partition=gpu-vram-94gb
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=20
 #SBATCH --mem=100G
 #SBATCH --gres=gpu:1
 #SBATCH --time=5-00:00:00

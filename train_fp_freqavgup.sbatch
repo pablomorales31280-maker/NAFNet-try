@@ -4,8 +4,8 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=100G
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=2
-#SBATCH --gres=gpu:2
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1
 #SBATCH --time=5-00:00:00
 #SBATCH --output=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/NAFNet_width32_fp_freqavgup_%J.out
 #SBATCH --error=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/NAFNet_width32_fp_freqavgup_%J.err
@@ -18,6 +18,5 @@ mkdir -p logs
 eval "$(conda shell.bash hook)"
 conda activate env
 
-PYTHONPATH=. python basicsr/train.py \
-  -opt options/train/GoPro/NAFNet_width32_fp_freqavgup.yml \
-  --launcher slurm
+
+PYTHONPATH=. python basicsr/train.py -opt options/train/GoPro/NAFNet_width32_fp_freqavgup.yml
