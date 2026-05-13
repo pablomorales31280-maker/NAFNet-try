@@ -88,7 +88,8 @@ def parse_options(is_train=True):
     else:
         args.padding = 'reflect'
         
-    os.environ["CUDA_VISIBLE_DEVICES"]="{}".format(args.gpu_id)
+    if args.launcher == 'none':
+        os.environ["CUDA_VISIBLE_DEVICES"] = "{}".format(args.gpu_id)
     opt = parse(args.opt, args, is_train=is_train)
 
     # distributed settings

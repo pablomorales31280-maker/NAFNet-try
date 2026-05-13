@@ -13,12 +13,15 @@ manual_seed: 42
 
 datasets:
   train:
+  train:
     name: gopro-train
     type: PairedImageDataset
-    dataroot_gt: ./datasets/GoPro/train/target
-    dataroot_lq: ./datasets/GoPro/train/input
+    dataroot_gt: ./datasets/GoPro/train/sharp_crops.lmdb
+    dataroot_lq: ./datasets/GoPro/train/blur_crops.lmdb
+
+    filename_tmpl: '{}'
     io_backend:
-      type: disk
+      type: lmdb
 
     gt_size: 256
     use_flip: true
@@ -40,7 +43,7 @@ datasets:
       type: lmdb
 
 network_g:
-  type: NAFNet
+  type: NAFNetLocal
   img_channel: 3
   width: 32
   middle_blk_num: 1
@@ -82,9 +85,7 @@ val:
   val_freq: !!float 2e4
   save_img: false
   max_minibatch: 1
-  grids: true
-  crop_size_h: 128
-  crop_size_w: 128
+  grids: false
 
   metrics:
     psnr: # metric name, can be arbitrary
