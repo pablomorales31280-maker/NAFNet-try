@@ -27,22 +27,23 @@ datasets:
 # network structures
 network_g:
   type: NAFNetLocal
+  img_channel: 3
   width: 32
-  enc_blk_nums: [1, 1, 1, 28]
   middle_blk_num: 1
+  enc_blk_nums: [1, 1, 1, 28]
   dec_blk_nums: [1, 1, 1, 1]
-  dw_expand: 1
-  ffn_expand: 2
+  downsample_type: convstride2
+  upsample_type: pixelshuffle
 
 # path
 path:
-  pretrain_network_g: experiments/new_flc_attack/NAFNet_GoPro_width32_base_conv_pixelshuffle/models/net_g_latest.pth
+  pretrain_network_g: experiments/new_flc_attack/NAFNet_GoPro_width32_conv_pixelshuffle/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~
 
 # validation settings
 val:
-  save_img: true
+  save_img: false
   grids: false
 
 
@@ -71,7 +72,7 @@ attack:
   method: pgd
   alpha: 0.01
   epsilon: 0.03137254901
-  iterations: 3
+  iterations: 20
   targeted: false
 
 train:

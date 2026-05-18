@@ -5,7 +5,7 @@
 # Copyright 2018-2020 BasicSR Authors
 # ------------------------------------------------------------------------
 # general settings
-name: NAFNet_conv_lctc_test_PGDattack
+name: NAFNet_pixelunshuffle_freqavgup_test_PGDattack
 model_type: ImageRestorationModel
 scale: 1
 num_gpu: 1 # set num_gpu: 0 for cpu mode
@@ -32,12 +32,12 @@ network_g:
   middle_blk_num: 1
   enc_blk_nums: [1, 1, 1, 28]
   dec_blk_nums: [1, 1, 1, 1]
-  downsample_type: convstride2
-  upsample_type: lctc_7
+  downsample_type: pixelunshuffle
+  upsample_type: freqavgup
 
 # path
 path:
-  pretrain_network_g: experiments/new_flc_attack/NAFNet_GoPro_width32_conv_lctc/models/net_g_latest.pth
+  pretrain_network_g: experiments/new_flc_attack/NAFNet_GoPro_width32_pixelunshuffle_freqavgup/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~
 

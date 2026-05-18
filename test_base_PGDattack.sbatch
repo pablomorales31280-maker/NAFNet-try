@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=test_base_conv_pixelshuffle_PGDattack
-#SBATCH --partition=gpu-vram-32gb
+#SBATCH --job-name=test_conv_pixelshuffle_PGDattack
+#SBATCH --partition=gpu-vram-94gb
 #SBATCH --cpus-per-task=20
 #SBATCH --mem=50G
 #SBATCH --gres=gpu:1
 #SBATCH --time=5-00:00:00
-#SBATCH --output=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/test_base_conv_pixelshuffle_PGDattack_%J.out
-#SBATCH --error=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/test_base_conv_pixelshuffle_PGDattack_%J.err
+#SBATCH --output=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/test_conv_pixelshuffle_PGDattack_%J.out
+#SBATCH --error=/home/pmorales/Shashank_code_BoA/freq-nafnet/logs/test_conv_pixelshuffle_PGDattack_%J.err
 
 set -euo pipefail
 
@@ -16,4 +16,4 @@ mkdir -p logs
 eval "$(conda shell.bash hook)"
 conda activate env
 
-PYTHONPATH=. python basicsr/test.py -opt /home/pmorales/Shashank_code_BoA/freq-nafnet/options/adv_attack/GoPro/NAFNet_width32_conv_pixelshuffle.yml
+PYTHONPATH=. python basicsr/test.py -opt /home/pmorales/Shashank_code_BoA/freq-nafnet/options/adv_attack/GoPro/NAFNet_width32_conv_pixelshuffle.yml --attacking
