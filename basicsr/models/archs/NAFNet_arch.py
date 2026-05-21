@@ -28,9 +28,7 @@ from basicsr.models.archs.downsampling import (
 from basicsr.models.archs.upsampling import (
     PixelShuffleUp,
     LCTCUp,
-    FreqAvgUp,
-    IgnoreGuide,
-    AnyUpInspired
+    FreqAvgUp
 )
 
 
@@ -52,15 +50,13 @@ def make_downsample(downsample_type, chan):
 
 def make_upsample(upsample_type, chan, out_chan):
     if upsample_type == "pixelshuffle":
-        return IgnoreGuide(PixelShuffleUp(chan, out_chan))
+        return PixelShuffleUp(chan, out_chan)
     elif upsample_type == "lctc_7":
-        return IgnoreGuide(LCTCUp(chan, out_chan, large_kernel=7, small_kernel=None))
+        return LCTCUp(chan, out_chan, large_kernel=7, small_kernel=None)
     elif upsample_type == "lctc_11_3":
-        return IgnoreGuide(LCTCUp(chan, out_chan, large_kernel=11, small_kernel=3))
+        return LCTCUp(chan, out_chan, large_kernel=11, small_kernel=3)
     elif upsample_type == "freqavgup":
-        return IgnoreGuide(FreqAvgUp(chan, out_chan, padding="zero"))
-    elif upsample_type == "anyup":
-        return AnyUpInspired(chan, out_chan)
+        return FreqAvgUp(chan, out_chan, padding="zero")
     else:
         raise ValueError(f"Unknown upsample_type: {upsample_type}")
     
@@ -198,7 +194,7 @@ class NAFNet(nn.Module):
         x = self.middle_blks(x)
 
         for decoder, up, enc_skip in zip(self.decoders, self.ups, encs[::-1]):
-            x = up(x, guide = enc_skip)
+            x = up(x)
             x = x + enc_skip
             x = decoder(x)
 
