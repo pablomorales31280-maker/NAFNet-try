@@ -24,11 +24,13 @@ from basicsr.models.archs.downsampling import (
     PixelUnshuffleDown,
     ConvStride2Down,
     FrequencyPreservedPooling,
+    tryfp
 )
 from basicsr.models.archs.upsampling import (
     PixelShuffleUp,
     LCTCUp,
-    FreqAvgUp
+    FreqAvgUp,
+    tryfau
 )
 
 
@@ -42,6 +44,9 @@ def make_downsample(downsample_type, chan):
         out_chan = chan * 4
     elif downsample_type == "fp":
         module = FrequencyPreservedPooling(channels=chan)
+        out_chan = chan * 4
+    elif downsample_type == "tryfp":
+        module = tryfp(channels=chan)
         out_chan = chan * 4
     else:
         raise ValueError(f"Unknown downsample_type: {downsample_type}")
@@ -57,6 +62,8 @@ def make_upsample(upsample_type, chan, out_chan):
         return LCTCUp(chan, out_chan, large_kernel=11, small_kernel=3)
     elif upsample_type == "freqavgup":
         return FreqAvgUp(chan, out_chan, padding="zero")
+    elif upsample_type == "tryfau":
+        return tryfau(chan, out_chan, padding="zero")
     else:
         raise ValueError(f"Unknown upsample_type: {upsample_type}")
     

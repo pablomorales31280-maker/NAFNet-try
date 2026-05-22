@@ -5,7 +5,7 @@
 # Copyright 2018-2020 BasicSR Authors
 # ------------------------------------------------------------------------
 # general settings
-name: NAFNet_GoPro_width32_baseline_true
+name: NAFNet_GoPro_width32_fp_freqavgup
 model_type: ImageRestorationModel
 scale: 1
 num_gpu: 1
@@ -29,7 +29,7 @@ datasets:
     # data loader
     use_shuffle: true
     num_worker_per_gpu: 4
-    batch_size_per_gpu: 32
+    batch_size_per_gpu: 8
     dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
@@ -48,8 +48,8 @@ network_g:
   middle_blk_num: 1
   enc_blk_nums: [1, 1, 1, 28]
   dec_blk_nums: [1, 1, 1, 1]
-  downsample_type: convstride2
-  upsample_type: pixelshuffle
+  downsample_type: tryfp
+  upsample_type: freqavgup
 
 # path
 path:

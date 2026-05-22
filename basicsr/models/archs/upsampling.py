@@ -73,52 +73,45 @@ class FreqAvgUp(nn.Module):
     
 
 
-class IgnoreGuide(nn.Module):
-    def __init__(self, module):
+
+class tryfau(nn.Module):
+    def __init__(self, in_channels, out_channels = None, padding = "constant", transpose = False, bias = False):
         super().__init__()
-        self.module = module
+        if out_channels is None:
+            out_channels = in_channels // 2
+        self.padding = "constant"
+        self.transpose = transpose
+        self.beta = nn.Parameter(torch.tensor(0.3, dtype = torch.float32))
+        self.body = nn.Conv2d(in_channels, out_channels * 4, kernel_size = 3, stride = 1, padding = 1, bias = bias)
+        self.shuffle = nn.PixelShuffle(2)
+        self.low_reduce = nn.Conv2d(out_channels * 4, out_channels, kernel_size = 1, groups = out_channels, bias = False)
+        with torch.no_grad():
+            self.low_reduce.weight.fill_(0.25)
 
-    def forward(self, x, guide=None):
-        return self.module(x)
-
-
-class AnyUpInspired(nn.Module):
-    def __init__(self, chan, target_chan, bias=False):
-        super().__init__()
-
-        self.low_proj = nn.Conv2d(chan, target_chan, kernel_size=1, bias=bias)
-        self.guide_proj = nn.Conv2d(target_chan, target_chan, kernel_size=1, bias=bias)
-
-        self.refine = nn.Sequential(
-            nn.Conv2d(target_chan * 2, target_chan, kernel_size=1, bias=bias),
-            nn.GELU(),
-            nn.Conv2d(
-                target_chan,
-                target_chan,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                groups=target_chan,
-                bias=bias,
-            ),
-            nn.Conv2d(target_chan, target_chan, kernel_size=1, bias=bias),
-        )
-
-        self.gamma = nn.Parameter(torch.zeros((1, target_chan, 1, 1)))
-
-    def forward(self, x, guide=None):
-        x = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False)
-        x = self.low_proj(x)
-
-        if guide is None:
-            return x
-
-        if x.shape[-2:] != guide.shape[-2:]:
-            x = F.interpolate(x, size=guide.shape[-2:], mode="bilinear", align_corners=False)
-
-        g = self.guide_proj(guide)
-
-        fused = torch.cat([x, g], dim=1)
-        refined = self.refine(fused)
-
-        return x + refined * self.gamma
+    def forward(self, x):
+        dtype = x.dtype
+        x = self.body(x)
+        if self.transpose:
+            x = x.transpose(2, 3)
+        freq = torch.fft.fft2(x.to(torch.float32), norm = "forward")
+        b, c, h, w = freq.shape
+        freq_g = freq.view(b, c // 4, 4, h, w)
+        avg = freq_g.mean(dim = 2)
+        avg_channels = avg.unsqueeze(2).expand(-1, -1, 4, -1, -1).reshape(b, c, h, w)
+        high_freq = freq - avg_channels
+        high_spatial = torch.fft.ifft2(high_freq, norm = "forward").real.to(dtype)
+        high_spatial = self.shuffle(high_spatial)
+        pad_w_left = w // 2
+        pad_w_right = w - pad_w_left
+        pad_h_top = h // 2
+        pad_h_bottom = h - pad_h_top
+        low_freq = torch.fft.fftshift(avg, dim = (-2, -1))
+        low_freq = F.pad(low_freq, (pad_w_left, pad_w_right, pad_h_top, pad_h_bottom), mode = self.padding, value = 0.0)
+        low_freq = torch.fft.ifftshift(low_freq, dim = (-2, -1))
+        low_spatial = torch.fft.ifft2(low_freq, norm = "forward").real.to(dtype)
+        if self.transpose:
+            low_spatial = low_spatial.transpose(2, 3)
+            high_spatial = high_spatial.transpose(2, 3)
+        beta = self.beta.to(device = x.device, dtype = low_spatial.dtype)
+        return low_spatial * (1 - beta) + high_spatial * beta
+    
