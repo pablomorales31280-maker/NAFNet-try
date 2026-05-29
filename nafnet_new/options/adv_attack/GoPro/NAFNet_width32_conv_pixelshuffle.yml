@@ -1,0 +1,82 @@
+# ------------------------------------------------------------------------
+# Copyright (c) 2022 megvii-model. All Rights Reserved.
+# ------------------------------------------------------------------------
+# Modified from BasicSR (https://github.com/xinntao/BasicSR)
+# Copyright 2018-2020 BasicSR Authors
+# ------------------------------------------------------------------------
+# general settings
+name: NAFNet_conv_pixelshuffle_test_cosPGDattack
+model_type: ImageRestorationModel
+scale: 1
+num_gpu: 1 # set num_gpu: 0 for cpu mode
+manual_seed: 10
+
+# dataset and data loader settings
+datasets:
+
+  test:
+    name: gopro-test
+    type: PairedImageDataset
+
+    dataroot_gt: ./datasets/GoPro/test/target.lmdb
+    dataroot_lq: ./datasets/GoPro/test/input.lmdb
+
+    io_backend:
+      type: lmdb
+
+# network structures
+network_g:
+  type: NAFNetLocal
+  img_channel: 3
+  width: 32
+  middle_blk_num: 1
+  enc_blk_nums: [1, 1, 1, 28]
+  dec_blk_nums: [1, 1, 1, 1]
+  downsample_type: convstride2
+  upsample_type: pixelshuffle
+
+# path
+path:
+  pretrain_network_g: experiments/new_flc_attack/NAFNet_GoPro_width32_base_conv_pixelshuffle/models/net_g_latest.pth
+  strict_load_g: true
+  resume_state: ~
+
+# validation settings
+val:
+  save_img: false
+  grids: false
+
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: false
+    lpips:
+      type: calculate_lpips
+      crop_border: 0
+      test_y_channel: false
+      net: alex
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500
+
+# Adversarial Attack Settings
+attack: 
+  method: cospgd_softmax
+  alpha: 0.01
+  epsilon: 0.03137254901
+  iterations: 20
+  targeted: false
+
+train:
+  pixel_opt:
+    type: MSELoss
+    loss_weight: 1
+    reduction: none
