@@ -16,4 +16,4 @@ mkdir -p logs
 eval "$(conda shell.bash hook)"
 conda activate env
 
-PYTHONPATH=. python basicsr/train.py -opt options/train/GoPro/NAFNet_width32_baseline_true.yml
+PYTHONPATH=. python basicsr/train.py -opt options/train/GoPro/NAFNet_width32_base.yml

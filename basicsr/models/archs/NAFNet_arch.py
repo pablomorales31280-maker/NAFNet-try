@@ -24,6 +24,7 @@ from basicsr.models.archs.downsampling import (
     PixelUnshuffleDown,
     ConvStride2Down,
     FrequencyPreservedPooling,
+    FrequencyPreservedPooling_DropHigh,
     tryfp
 )
 from basicsr.models.archs.upsampling import (
@@ -44,6 +45,9 @@ def make_downsample(downsample_type, chan):
         out_chan = chan * 4
     elif downsample_type == "fp":
         module = FrequencyPreservedPooling(channels=chan)
+        out_chan = chan * 4
+    elif downsample_type == "fpdh":
+        module = FrequencyPreservedPooling_DropHigh(channels=chan)
         out_chan = chan * 4
     elif downsample_type == "tryfp":
         module = tryfp(channels=chan)
