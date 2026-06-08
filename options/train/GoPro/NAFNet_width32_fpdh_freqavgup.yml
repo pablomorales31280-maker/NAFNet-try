@@ -71,6 +71,7 @@ train:
     eta_min: !!float 1e-7
 
   total_iter: 200000
+  save_checkpoint_freq: 100000
   warmup_iter: -1 # no warm up
 
   # losses
