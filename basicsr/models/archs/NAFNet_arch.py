@@ -36,7 +36,7 @@ from basicsr.models.archs.upsampling import (
 
 
 
-def make_downsample(downsample_type, chan):
+def make_downsample(downsample_type, chan, fpdh_drop_prob = 0.3):
     if downsample_type == "convstride2":
         module = ConvStride2Down(chan, chan * 2)
         out_chan = chan * 2
@@ -47,7 +47,7 @@ def make_downsample(downsample_type, chan):
         module = FrequencyPreservedPooling(channels=chan)
         out_chan = chan * 4
     elif downsample_type == "fpdh":
-        module = FrequencyPreservedPooling_DropHigh(channels=chan)
+        module = FrequencyPreservedPooling_DropHigh(channels=chan, drop_prob=fpdh_drop_prob)
         out_chan = chan * 4
     elif downsample_type == "tryfp":
         module = tryfp(channels=chan)
@@ -138,7 +138,7 @@ class NAFBlock(nn.Module):
 
 class NAFNet(nn.Module):
 
-    def __init__(self, img_channel=3, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], downsample_type = "convstride2", upsample_type = "pixelshuffle", *args, **kwargs):
+    def __init__(self, img_channel=3, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], downsample_type = "convstride2", upsample_type = "pixelshuffle", fpdh_drop_prob=0.3, *args, **kwargs):
         super().__init__()
 
         self.intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
@@ -153,13 +153,14 @@ class NAFNet(nn.Module):
         self.downs = nn.ModuleList()
         self.downsample_type = downsample_type
         self.upsample_type = upsample_type
+        self.fpdh_drop_prob = fpdh_drop_prob
 
         encoder_channels = [width]
         chan = width
 
         for num in enc_blk_nums:
             self.encoders.append(nn.Sequential(*[NAFBlock(chan) for _ in range(num)]))
-            down_module, next_chan = make_downsample(self.downsample_type, chan)
+            down_module, next_chan = make_downsample(self.downsample_type, chan, self.fpdh_drop_prob)
             self.downs.append(down_module)
             chan = next_chan
             encoder_channels.append(next_chan)

@@ -80,7 +80,9 @@ def parse(opt_path, args, is_train=True):
     opt['network_g']['para_kernel_size'] = args.para_kernel_size
     
     opt['network_g']['padding'] = args.padding
-        
+    
+    opt['network_g']['fpdh_drop_prob'] = args.fpdh_drop_prob
+
     opt['network_g']['use_conv'] = args.use_conv
     opt['network_g']['first_drop_alpha'] = args.first_drop_alpha
     opt['network_g']['drop_alpha'] = args.drop_alpha
@@ -119,6 +121,7 @@ def parse(opt_path, args, is_train=True):
         
     
     if 'name' in opt:
+        opt['name'] += '_fpdh_drop_{}'.format(args.fpdh_drop_prob)
         if args.kernel_size > 1:
             opt['name'] += '_trans_up_kernel_{}'.format(args.kernel_size)
             if args.para_kernel_size > 1:

@@ -69,7 +69,7 @@ class FrequencyPreservedPooling(nn.Module):
 
 
 class FrequencyPreservedPooling_DropHigh(nn.Module):
-    def __init__(self, channels = None, test_wo_drop_alpha = False, transpose = True, test_drop_alpha = False, stop = False, half_precision = False, padding = "reflect"):
+    def __init__(self, channels = None, test_wo_drop_alpha = False, transpose = True, test_drop_alpha = False, stop = False, half_precision = False, padding = "reflect", drop_prob = 0.3):
         super().__init__()
         self.transpose = transpose  
         self.test_wo_drop_alpha = test_wo_drop_alpha
@@ -80,6 +80,7 @@ class FrequencyPreservedPooling_DropHigh(nn.Module):
         self.alpha = nn.Parameter(torch.tensor(0.3), requires_grad = True)
         self.downsample_high = nn.PixelUnshuffle(2)
         self.drop = 0
+        self.drop_prob = drop_prob
 
     def forward(self, x):
         orig_x_size = x.shape
@@ -95,7 +96,7 @@ class FrequencyPreservedPooling_DropHigh(nn.Module):
         if self.transpose :
             low_part = low_part.transpose(2, 3)
         low_part = torch.cat((low_part, low_part, low_part, low_part), dim = 1)
-        self.drop = torch.tensor(np.random.choice(2, replace=True, p=[0.3, 0.7]))
+        self.drop = torch.tensor(np.random.choice(2, replace=True, p=[self.drop_prob, 1 - self.drop_prob]))
         if self.test_drop_alpha :
             return T.CenterCrop((orig_x_size[-2]//2, orig_x_size[-1]//2))(low_part)
         elif self.drop == 0 and not self.test_wo_drop_alpha:

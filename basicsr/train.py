@@ -49,6 +49,7 @@ def parse_options(is_train=True):
     parser.add_argument('--gpu_id', type=int, required=False, default=0)
     parser.add_argument('--alpha', type=float, required=False, default=0.01)
     parser.add_argument('--epsilon', type=float, required=False, default=0.03137254901)
+    parser.add_argument('--fpdh_drop_prob', type=float, required=False, default=0.3)
     parser.add_argument('--targeted', type=bool, required=False, default=False)
 
     parser.add_argument('--input_path', type=str, required=False, help='The path to the input image. For single image inference only.')
